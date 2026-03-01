@@ -1,9 +1,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AuthenticityResult, ConsistencyResult, Claim, FaultAnalysis } from "./types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY! });
+function getAI() {
+  return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+}
 
 export async function analyzeFault(claims: Claim[]): Promise<FaultAnalysis> {
+  const ai = getAI();
   const model = "gemini-3.1-pro-preview";
   
   const claimSummaries = claims.map(c => ({
@@ -82,6 +85,7 @@ export async function analyzeFault(claims: Claim[]): Promise<FaultAnalysis> {
 }
 
 export async function analyzeAuthenticity(imageBase64: string): Promise<AuthenticityResult> {
+  const ai = getAI();
   const model = "gemini-3.1-pro-preview";
   
   const response = await ai.models.generateContent({
@@ -140,6 +144,7 @@ export async function analyzeAuthenticity(imageBase64: string): Promise<Authenti
 }
 
 export async function analyzeConsistency(imageBase64: string, description: string): Promise<ConsistencyResult> {
+  const ai = getAI();
   const model = "gemini-3.1-pro-preview";
 
   const response = await ai.models.generateContent({
