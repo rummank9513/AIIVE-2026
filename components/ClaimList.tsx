@@ -128,17 +128,34 @@ export function ClaimList({ claims, onSelect, role, onAnalyzeFault, isAnalyzingF
                     onClick={() => onSelect(claim)}
                     className="w-full flex items-center gap-4 p-6 hover:bg-slate-50 transition-colors text-left group"
                   >
-                    <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 border border-slate-200 bg-slate-100">
-                      {claim.mediaType === 'video' ? (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-1">
-                          <Video className="w-7 h-7" />
-                          <span className="text-[9px] font-black uppercase tracking-wider">Video</span>
-                        </div>
-                      ) : claim.imageUrl ? (
-                        <img src={claim.imageUrl} alt="Claim" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-300">
-                          <ImageIcon className="w-8 h-8" />
+                    <div className="relative flex-shrink-0">
+                      <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+                        {claim.mediaItems?.[0]?.mediaType === 'video' ? (
+                          claim.mediaItems[0].imageUrl ? (
+                            <div className="w-full h-full" onClick={e => e.stopPropagation()}>
+                              <video
+                                src={claim.mediaItems[0].imageUrl}
+                                controls
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-1">
+                              <Video className="w-7 h-7" />
+                              <span className="text-[9px] font-black uppercase tracking-wider">Video</span>
+                            </div>
+                          )
+                        ) : claim.mediaItems?.[0]?.imageUrl ? (
+                          <img src={claim.mediaItems[0].imageUrl} alt="Claim" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-300">
+                            <ImageIcon className="w-8 h-8" />
+                          </div>
+                        )}
+                      </div>
+                      {(claim.mediaItems?.length ?? 0) > 1 && (
+                        <div className="absolute -bottom-1.5 -right-1.5 bg-slate-800 text-white text-[9px] font-black rounded-full w-5 h-5 flex items-center justify-center leading-none">
+                          +{claim.mediaItems.length - 1}
                         </div>
                       )}
                     </div>

@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { AuthenticityResult, ConsistencyResult, Claim, FaultAnalysis, MediaType } from "./types";
+import { AuthenticityResult, ConsistencyResult, Claim, FaultAnalysis, MediaItem, MediaType } from "./types";
 
 function getAI() {
   return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
@@ -244,4 +244,16 @@ export function calculateVerdict(
     status: suspicionScore > 50 ? 'SUSPICIOUS' : 'CLEAN',
     score: suspicionScore,
   };
+}
+
+// Overall verdict biased toward the worst-scoring item (max * 0.6 + avg * 0.4)
+export function calculateOverallVerdict(
+  items: MediaItem[]
+): { status: 'SUSPICIOUS' | 'CLEAN', score: number } {
+  if (items.length === 0) return { status: 'CLEAN', score: 0 };
+  const scores = items.map(i => i.verdictScore);
+  const max = Math.max(...scores);
+  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+  const combined = Math.round(Math.min(100, max * 0.6 + avg * 0.4));
+  return { status: combined > 50 ? 'SUSPICIOUS' : 'CLEAN', score: combined };
 }

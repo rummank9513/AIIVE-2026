@@ -1,17 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Claim, Role } from '@/lib/types';
+import { Claim, MediaItem, Role } from '@/lib/types';
 
 const DB_KEY = 'fraudlens_claims_db';
 const THUMB_MAX_PX = 800;
 const THUMB_QUALITY = 0.6;
 
-// Compress a base64 image down to a small thumbnail for localStorage.
-// Videos are not compressible this way — store an empty string instead
-// (the full data stays in React state for the current session).
 function compressForStorage(imageUrl: string, mediaType: 'image' | 'video'): Promise<string> {
   if (mediaType === 'video') return Promise.resolve('');
+  if (!imageUrl) return Promise.resolve('');
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -27,6 +25,21 @@ function compressForStorage(imageUrl: string, mediaType: 'image' | 'video'): Pro
   });
 }
 
+// Migrate old single-media claims that don't have mediaItems
+function migrateClaim(raw: any): Claim {
+  if (raw.mediaItems && Array.isArray(raw.mediaItems)) return raw as Claim;
+  const item: MediaItem = {
+    id: raw.id + '_0',
+    imageUrl: raw.imageUrl || '',
+    mediaType: raw.mediaType || 'image',
+    authenticity: raw.authenticity,
+    consistency: raw.consistency,
+    verdictScore: raw.verdictScore,
+    status: raw.status,
+  };
+  return { ...raw, mediaItems: [item] } as Claim;
+}
+
 export function useClaims() {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [currentRole, setCurrentRole] = useState<Role>('officer');
@@ -35,8 +48,9 @@ export function useClaims() {
     const saved = localStorage.getItem(DB_KEY);
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        const timeoutId = setTimeout(() => setClaims(parsed), 0);
+        const parsed: any[] = JSON.parse(saved);
+        const migrated = parsed.map(migrateClaim);
+        const timeoutId = setTimeout(() => setClaims(migrated), 0);
         return () => clearTimeout(timeoutId);
       } catch (e) {
         console.error('Failed to parse claims', e);
@@ -45,14 +59,25 @@ export function useClaims() {
   }, []);
 
   const addClaim = async (claim: Claim) => {
-    // Keep the full-resolution image in React state for the current session
     const updated = [claim, ...claims];
     setClaims(updated);
 
-    // Compress before writing to localStorage to stay under the 5MB quota
-    const compressedImageUrl = await compressForStorage(claim.imageUrl, claim.mediaType);
-    const claimForStorage = { ...claim, imageUrl: compressedImageUrl };
-    const updatedForStorage = [claimForStorage, ...claims.map(c => ({ ...c, imageUrl: c.imageUrl }))];
+    // Compress each media item's imageUrl before writing to localStorage
+    const compressedItems: MediaItem[] = await Promise.all(
+      claim.mediaItems.map(async (item) => ({
+        ...item,
+        imageUrl: await compressForStorage(item.imageUrl, item.mediaType),
+      }))
+    );
+    const compressedFirst = compressedItems[0];
+    const claimForStorage: Claim = {
+      ...claim,
+      mediaItems: compressedItems,
+      imageUrl: compressedFirst?.imageUrl ?? '',
+      mediaType: compressedFirst?.mediaType ?? 'image',
+    };
+
+    const updatedForStorage = [claimForStorage, ...claims];
 
     try {
       localStorage.setItem(DB_KEY, JSON.stringify(updatedForStorage));
