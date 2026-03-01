@@ -2,7 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { AuthenticityResult, ConsistencyResult, Claim, FaultAnalysis } from "./types";
 
 function getAI() {
-  return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+  return new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY!, dangerouslyAllowBrowser: true });
 }
 
 export async function analyzeFault(claims: Claim[]): Promise<FaultAnalysis> {
