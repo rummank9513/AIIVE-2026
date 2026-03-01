@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Camera, Upload, Send, Loader2 } from 'lucide-react';
-import { analyzeAuthenticity, analyzeConsistency, calculateVerdict } from '@/lib/gemini';
-import { Claim } from '@/lib/types';
+import { Camera, Video, Send, Loader2 } from 'lucide-react';
+import { calculateVerdict } from '@/lib/gemini';
+import { Claim, MediaType } from '@/lib/types';
 import { motion } from 'motion/react';
 
 interface ClaimFormProps {
@@ -11,65 +11,83 @@ interface ClaimFormProps {
   onSuccess: (claim: Claim) => void;
 }
 
+const MAX_FILE_MB = 25;
+
 export function ClaimForm({ clientId, onSuccess }: ClaimFormProps) {
   const [description, setDescription] = useState('');
   const [claimNumber, setClaimNumber] = useState('');
-  const [image, setImage] = useState<string | null>(null);
+  const [media, setMedia] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<MediaType>('image');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStep, setSubmitStep] = useState('');
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (file.size > MAX_FILE_MB * 1024 * 1024) {
+      alert(`File is too large. Please upload a file under ${MAX_FILE_MB}MB.`);
+      return;
     }
+    setMediaType(file.type.startsWith('video/') ? 'video' : 'image');
+    const reader = new FileReader();
+    reader.onloadend = () => setMedia(reader.result as string);
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!image || !description || !claimNumber) return;
+    if (!media || !description || !claimNumber) return;
 
     setIsSubmitting(true);
     try {
-      // Step 1: Authenticity
-      const authResult = await analyzeAuthenticity(image);
-      
-      // Step 2: Consistency
-      const consResult = await analyzeConsistency(image, description);
-      
-      // Step 3: Verdict
-      const { status, score } = calculateVerdict(authResult, consResult);
+      setSubmitStep('Running AI analysis...');
+
+      const [authRes, consRes] = await Promise.all([
+        fetch('/api/analyze-authenticity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mediaBase64: media, mediaType }),
+        }).then(r => r.json()),
+        fetch('/api/analyze-consistency', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mediaBase64: media, description, mediaType }),
+        }).then(r => r.json()),
+      ]);
+
+      setSubmitStep('Calculating verdict...');
+      const { status, score } = calculateVerdict(authRes.gemini, consRes);
 
       const newClaim: Claim = {
         id: Math.random().toString(36).substring(7),
         claimNumber,
         clientId,
         description,
-        imageUrl: image,
+        imageUrl: media,
+        mediaType,
         timestamp: Date.now(),
         status,
         verdictScore: score,
-        authenticity: authResult,
-        consistency: consResult
+        authenticity: authRes.gemini,
+        consistency: consRes,
       };
 
       onSuccess(newClaim);
       setDescription('');
       setClaimNumber('');
-      setImage(null);
+      setMedia(null);
+      setMediaType('image');
     } catch (error) {
-      console.error("Submission failed", error);
-      alert("Failed to process claim. Please try again.");
+      console.error('Submission failed', error);
+      alert('Failed to process claim. Please try again.');
     } finally {
       setIsSubmitting(false);
+      setSubmitStep('');
     }
   };
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"
@@ -100,51 +118,50 @@ export function ClaimForm({ clientId, onSuccess }: ClaimFormProps) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Evidence Photo</label>
+          <label className="block text-sm font-medium text-slate-700 mb-2">
+            Evidence Photo or Video
+            <span className="ml-2 text-xs text-slate-400 font-normal">Max {MAX_FILE_MB}MB</span>
+          </label>
           <div className="relative">
             <input
               type="file"
-              accept="image/*"
-              onChange={handleImageChange}
+              accept="image/*,video/*"
+              onChange={handleMediaChange}
               className="hidden"
-              id="image-upload"
+              id="media-upload"
               required
             />
-            
-            {image ? (
+
+            {media ? (
               <div className="relative group">
                 <div className="w-full aspect-video bg-slate-900 rounded-2xl overflow-hidden border border-slate-200 shadow-inner">
-                  <img 
-                    src={image} 
-                    alt="Preview" 
-                    className="w-full h-full object-contain" 
-                  />
+                  {mediaType === 'video' ? (
+                    <video src={media} controls className="w-full h-full object-contain" />
+                  ) : (
+                    <img src={media} alt="Preview" className="w-full h-full object-contain" />
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setImage(null)}
-                  className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-slate-900 p-2 rounded-xl shadow-lg hover:bg-white transition-all active:scale-95"
-                >
-                  <Camera className="w-5 h-5" />
-                </button>
                 <label
-                  htmlFor="image-upload"
+                  htmlFor="media-upload"
                   className="absolute bottom-4 right-4 bg-slate-900/90 backdrop-blur-sm text-white px-4 py-2 rounded-xl shadow-lg hover:bg-slate-900 transition-all cursor-pointer text-xs font-bold uppercase tracking-wider"
                 >
-                  Change Photo
+                  Change File
                 </label>
               </div>
             ) : (
               <label
-                htmlFor="image-upload"
+                htmlFor="media-upload"
                 className="flex flex-col items-center justify-center w-full aspect-video border-2 border-dashed border-slate-200 rounded-3xl cursor-pointer hover:bg-slate-50 hover:border-emerald-500 transition-all group"
               >
                 <div className="flex flex-col items-center text-slate-400 group-hover:text-emerald-500">
                   <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-emerald-50 transition-colors">
-                    <Camera className="w-8 h-8" />
+                    <div className="flex gap-2">
+                      <Camera className="w-6 h-6" />
+                      <Video className="w-6 h-6" />
+                    </div>
                   </div>
-                  <span className="text-sm font-bold">Click to upload or take photo</span>
-                  <span className="text-xs text-slate-400 mt-1">High quality photos help analysis</span>
+                  <span className="text-sm font-bold">Click to upload photo or video</span>
+                  <span className="text-xs text-slate-400 mt-1">High quality evidence helps analysis</span>
                 </div>
               </label>
             )}
@@ -159,7 +176,7 @@ export function ClaimForm({ clientId, onSuccess }: ClaimFormProps) {
           {isSubmitting ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
-              Analyzing Claim...
+              {submitStep || 'Analyzing...'}
             </>
           ) : (
             <>

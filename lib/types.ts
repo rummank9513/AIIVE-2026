@@ -1,4 +1,5 @@
 export type Role = 'client1' | 'client2' | 'officer';
+export type MediaType = 'image' | 'video';
 
 export interface AuthenticityResult {
   is_ai_generated: boolean;
@@ -7,6 +8,7 @@ export interface AuthenticityResult {
   flags: string[];
   reasoning: string;
 }
+
 
 export interface ConsistencyResult {
   location_match: boolean;
@@ -36,6 +38,7 @@ export interface Claim {
   clientId: string;
   description: string;
   imageUrl: string;
+  mediaType: MediaType;
   timestamp: number;
   status: 'SUSPICIOUS' | 'CLEAN';
   verdictScore: number;

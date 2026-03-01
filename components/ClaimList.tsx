@@ -12,6 +12,7 @@ import {
   Search,
   Filter,
   Image as ImageIcon,
+  Video,
   Scale,
   Loader2
 } from 'lucide-react';
@@ -128,7 +129,12 @@ export function ClaimList({ claims, onSelect, role, onAnalyzeFault, isAnalyzingF
                     className="w-full flex items-center gap-4 p-6 hover:bg-slate-50 transition-colors text-left group"
                   >
                     <div className="relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 border border-slate-200 bg-slate-100">
-                      {claim.imageUrl ? (
+                      {claim.mediaType === 'video' ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-1">
+                          <Video className="w-7 h-7" />
+                          <span className="text-[9px] font-black uppercase tracking-wider">Video</span>
+                        </div>
+                      ) : claim.imageUrl ? (
                         <img src={claim.imageUrl} alt="Claim" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-slate-300">

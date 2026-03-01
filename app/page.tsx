@@ -8,7 +8,6 @@ import { ClaimList } from '@/components/ClaimList';
 import { ClaimDetail } from '@/components/ClaimDetail';
 import { FaultAnalysisModal } from '@/components/FaultAnalysisModal';
 import { Claim, FaultAnalysis } from '@/lib/types';
-import { analyzeFault } from '@/lib/gemini';
 import { Shield, FileText, AlertTriangle, CheckCircle2, LayoutDashboard } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
@@ -23,7 +22,12 @@ export default function Home() {
   const handleAnalyzeFault = async (group: Claim[]) => {
     setIsAnalyzingFault(group[0].claimNumber);
     try {
-      const result = await analyzeFault(group);
+      const res = await fetch('/api/analyze-fault', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claims: group }),
+      });
+      const result = await res.json();
       setFaultAnalysis(result);
     } catch (error) {
       console.error("Fault analysis failed", error);

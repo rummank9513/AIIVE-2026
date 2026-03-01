@@ -2,18 +2,17 @@
 
 import React from 'react';
 import { Claim, Role } from '@/lib/types';
-import { 
-  X, 
-  ShieldAlert, 
-  ShieldCheck, 
-  AlertCircle, 
-  CheckCircle2, 
+import {
+  X,
+  ShieldAlert,
+  ShieldCheck,
+  AlertCircle,
+  CheckCircle2,
   Clock,
-  Info,
-  ExternalLink,
   FileText,
   Image as ImageIcon,
-  Maximize2
+  Video,
+  Maximize2,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
@@ -42,6 +41,7 @@ export function ClaimDetail({ claim, onClose, role }: ClaimDetailProps) {
         className="bg-white w-full max-w-5xl max-h-[95vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-white/20"
         onClick={e => e.stopPropagation()}
       >
+        {/* Header */}
         <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div className="flex items-center gap-4">
             <div className={cn(
@@ -56,6 +56,11 @@ export function ClaimDetail({ claim, onClose, role }: ClaimDetailProps) {
                 <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(claim.timestamp).toLocaleString()}</span>
                 <span className="w-1 h-1 rounded-full bg-slate-300" />
                 <span className="font-mono">ID: {claim.id}</span>
+                {claim.mediaType === 'video' && (
+                  <span className="flex items-center gap-1 text-indigo-500 font-semibold">
+                    <Video className="w-3 h-3" /> Video
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -69,24 +74,31 @@ export function ClaimDetail({ claim, onClose, role }: ClaimDetailProps) {
             "grid grid-cols-1 gap-12",
             isOfficer ? "lg:grid-cols-2" : "max-w-3xl mx-auto"
           )}>
-            {/* Left Column: Image and Description */}
+            {/* Left Column: Media + Description */}
             <div className="space-y-8">
               <section>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-[0.2em]">
-                    <ImageIcon className="w-4 h-4" /> Evidence Photo
+                    {claim.mediaType === 'video'
+                      ? <><Video className="w-4 h-4" /> Evidence Video</>
+                      : <><ImageIcon className="w-4 h-4" /> Evidence Photo</>
+                    }
                   </h3>
                   <button className="text-slate-400 hover:text-slate-600 transition-colors">
                     <Maximize2 className="w-4 h-4" />
                   </button>
                 </div>
                 <div className="group relative aspect-[4/3] rounded-[2rem] overflow-hidden border border-slate-200 shadow-2xl bg-slate-900">
-                  <img 
-                    src={claim.imageUrl} 
-                    alt="Damage" 
-                    className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105" 
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  {claim.mediaType === 'video' ? (
+                    <video src={claim.imageUrl} controls className="w-full h-full object-contain" />
+                  ) : (
+                    <img
+                      src={claim.imageUrl}
+                      alt="Damage"
+                      className="w-full h-full object-contain transition-transform duration-700 group-hover:scale-105"
+                    />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                 </div>
               </section>
 
@@ -100,7 +112,7 @@ export function ClaimDetail({ claim, onClose, role }: ClaimDetailProps) {
               </section>
             </div>
 
-            {/* Right Column: Analysis Results (Officer Only) */}
+            {/* Right Column: Analysis (Officer Only) */}
             {isOfficer && (
               <div className="space-y-8">
                 {/* Verdict Summary */}
@@ -121,7 +133,7 @@ export function ClaimDetail({ claim, onClose, role }: ClaimDetailProps) {
                     <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Risk Score</div>
                     <div className={cn(
                       "text-5xl font-black tracking-tighter",
-                      claim.verdictScore > 70 ? "text-red-600" : 
+                      claim.verdictScore > 70 ? "text-red-600" :
                       claim.verdictScore > 40 ? "text-orange-500" : "text-emerald-600"
                     )}>
                       {Math.round(claim.verdictScore)}%
@@ -129,7 +141,7 @@ export function ClaimDetail({ claim, onClose, role }: ClaimDetailProps) {
                   </div>
                 </div>
 
-                {/* Authenticity Scan */}
+                {/* AI Authenticity Scan */}
                 <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="font-black text-slate-900 uppercase tracking-tight">AI Authenticity Scan</h3>
@@ -137,7 +149,7 @@ export function ClaimDetail({ claim, onClose, role }: ClaimDetailProps) {
                       Confidence: {claim.authenticity.confidence_score}%
                     </div>
                   </div>
-                  
+
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       {claim.authenticity.is_ai_generated || claim.authenticity.is_ai_altered ? (
@@ -146,11 +158,11 @@ export function ClaimDetail({ claim, onClose, role }: ClaimDetailProps) {
                         <div className="p-2 bg-emerald-100 rounded-xl"><CheckCircle2 className="w-5 h-5 text-emerald-600" /></div>
                       )}
                       <span className="text-sm font-bold text-slate-700">
-                        {claim.authenticity.is_ai_generated ? "AI Generated Content Detected" : 
+                        {claim.authenticity.is_ai_generated ? "AI Generated Content Detected" :
                          claim.authenticity.is_ai_altered ? "AI Manipulation Detected" : "No AI Generation Detected"}
                       </span>
                     </div>
-                    
+
                     {claim.authenticity.flags.length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {claim.authenticity.flags.map((flag, i) => (
@@ -160,7 +172,7 @@ export function ClaimDetail({ claim, onClose, role }: ClaimDetailProps) {
                         ))}
                       </div>
                     )}
-                    
+
                     <p className="text-sm text-slate-500 bg-slate-50 p-5 rounded-2xl border border-slate-100 leading-relaxed">
                       {claim.authenticity.reasoning}
                     </p>
@@ -207,7 +219,7 @@ export function ClaimDetail({ claim, onClose, role }: ClaimDetailProps) {
         </div>
 
         <div className="p-8 bg-slate-50/50 border-t border-slate-100 flex justify-end gap-4">
-          <button 
+          <button
             onClick={onClose}
             className="px-8 py-3 rounded-2xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-100 transition-all active:scale-95"
           >

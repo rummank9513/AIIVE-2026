@@ -1,14 +1,20 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { AuthenticityResult, ConsistencyResult, Claim, FaultAnalysis } from "./types";
+import { AuthenticityResult, ConsistencyResult, Claim, FaultAnalysis, MediaType } from "./types";
 
 function getAI() {
-  return new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY!, dangerouslyAllowBrowser: true });
+  return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+}
+
+function getMediaMimeType(base64: string, mediaType: MediaType): string {
+  const match = base64.match(/^data:([^;]+);/);
+  if (match) return match[1];
+  return mediaType === 'video' ? 'video/mp4' : 'image/jpeg';
 }
 
 export async function analyzeFault(claims: Claim[]): Promise<FaultAnalysis> {
   const ai = getAI();
   const model = "gemini-3.1-pro-preview";
-  
+
   const claimSummaries = claims.map(c => ({
     clientId: c.clientId,
     description: c.description,
@@ -24,18 +30,18 @@ export async function analyzeFault(claims: Claim[]): Promise<FaultAnalysis> {
       {
         parts: [
           {
-            text: `You are a senior insurance claims adjuster. 
+            text: `You are a senior insurance claims adjuster.
             Below are multiple claims filed for the same accident (Claim Number: ${claims[0].claimNumber}).
             Analyze the descriptions and the AI-generated fraud/consistency scores to determine who is most likely at fault.
-            
+
             Consider:
             - If one party has a high "Suspicion Score" or AI manipulation flags, their testimony is less reliable.
             - Compare the descriptions for contradictions.
             - Look for admissions of fault or descriptions of maneuvers that typically assign fault (e.g., rear-ending, failing to yield).
-            
+
             Claims Data:
             ${JSON.stringify(claimSummaries, null, 2)}
-            
+
             Return a JSON object with the following structure:
             {
               "claimNumber": "${claims[0].claimNumber}",
@@ -84,28 +90,34 @@ export async function analyzeFault(claims: Claim[]): Promise<FaultAnalysis> {
   return JSON.parse(response.text || "{}");
 }
 
-export async function analyzeAuthenticity(imageBase64: string): Promise<AuthenticityResult> {
+export async function analyzeAuthenticity(
+  mediaBase64: string,
+  mediaType: MediaType = 'image'
+): Promise<AuthenticityResult> {
   const ai = getAI();
   const model = "gemini-3.1-pro-preview";
-  
+  const mimeType = getMediaMimeType(mediaBase64, mediaType);
+  const mediaLabel = mediaType === 'video' ? 'video' : 'image';
+
   const response = await ai.models.generateContent({
     model,
     contents: [
       {
         parts: [
           {
-            text: `Analyze this image of a vehicle for signs of AI generation or intentional digital manipulation. 
+            text: `Analyze this ${mediaLabel} of a vehicle for signs of AI generation or intentional digital manipulation.
             IMPORTANT: Do not mistake low image quality, motion blur, or standard JPEG compression artifacts for AI generation.
-            
+
             Look specifically for:
             - Impossible geometry in the car's body lines.
             - Textures that "melt" into each other (e.g., a tire merging with the pavement).
             - Nonsensical text on license plates or badges.
             - Cloning artifacts where the exact same scratch pattern is repeated perfectly.
             - Lighting that comes from multiple conflicting directions.
-            
+            ${mediaType === 'video' ? '- For video: unnatural motion patterns, inconsistent temporal coherence between frames.' : ''}
+
             Be conservative: if you are unsure, do not flag as AI generated.
-            
+
             Return a JSON object with the following structure:
             {
               "is_ai_generated": boolean,
@@ -117,8 +129,8 @@ export async function analyzeAuthenticity(imageBase64: string): Promise<Authenti
           },
           {
             inlineData: {
-              mimeType: "image/jpeg",
-              data: imageBase64.split(',')[1] || imageBase64
+              mimeType,
+              data: mediaBase64.split(',')[1] || mediaBase64
             }
           }
         ]
@@ -143,9 +155,15 @@ export async function analyzeAuthenticity(imageBase64: string): Promise<Authenti
   return JSON.parse(response.text || "{}");
 }
 
-export async function analyzeConsistency(imageBase64: string, description: string): Promise<ConsistencyResult> {
+export async function analyzeConsistency(
+  mediaBase64: string,
+  description: string,
+  mediaType: MediaType = 'image'
+): Promise<ConsistencyResult> {
   const ai = getAI();
   const model = "gemini-3.1-pro-preview";
+  const mimeType = getMediaMimeType(mediaBase64, mediaType);
+  const mediaLabel = mediaType === 'video' ? 'video' : 'image';
 
   const response = await ai.models.generateContent({
     model,
@@ -155,14 +173,14 @@ export async function analyzeConsistency(imageBase64: string, description: strin
           {
             text: `You are an insurance fraud analyst.
             User's accident description: "${description}"
-            Analyze the uploaded image of the vehicle damage and compare it against the description above.
-            
+            Analyze the uploaded ${mediaLabel} of the vehicle damage and compare it against the description above.
+
             Evaluate:
             - Does the damage LOCATION match the description?
             - Does the damage SEVERITY match the description?
             - Are there any damages visible that were NOT mentioned?
             - Does the damage TYPE make sense given how the accident was described?
-            
+
             Return a JSON object with the following structure:
             {
               "location_match": boolean,
@@ -176,8 +194,8 @@ export async function analyzeConsistency(imageBase64: string, description: strin
           },
           {
             inlineData: {
-              mimeType: "image/jpeg",
-              data: imageBase64.split(',')[1] || imageBase64
+              mimeType,
+              data: mediaBase64.split(',')[1] || mediaBase64
             }
           }
         ]
@@ -204,27 +222,26 @@ export async function analyzeConsistency(imageBase64: string, description: strin
   return JSON.parse(response.text || "{}");
 }
 
-export function calculateVerdict(auth: AuthenticityResult, cons: ConsistencyResult): { status: 'SUSPICIOUS' | 'CLEAN', score: number } {
+export function calculateVerdict(
+  auth: AuthenticityResult,
+  cons: ConsistencyResult
+): { status: 'SUSPICIOUS' | 'CLEAN', score: number } {
   let suspicionScore = 0;
-  
-  // AI Generation is a huge red flag, but only if confidence is high
+
   if (auth.is_ai_generated && auth.confidence_score > 70) suspicionScore += 70;
   else if (auth.is_ai_generated) suspicionScore += 40;
-  
+
   if (auth.is_ai_altered && auth.confidence_score > 70) suspicionScore += 40;
   else if (auth.is_ai_altered) suspicionScore += 20;
-  
-  // Consistency score is 0-100 (where 100 is perfectly consistent)
-  // Only add to suspicion if consistency is significantly low
+
   if (cons.consistency_score < 80) {
     suspicionScore += (80 - cons.consistency_score) * 0.8;
   }
-  
-  // Cap at 100
+
   suspicionScore = Math.round(Math.min(100, suspicionScore));
-  
+
   return {
     status: suspicionScore > 50 ? 'SUSPICIOUS' : 'CLEAN',
-    score: suspicionScore
+    score: suspicionScore,
   };
 }
