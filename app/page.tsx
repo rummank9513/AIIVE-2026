@@ -53,7 +53,7 @@ export default function Home() {
               <Shield className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold tracking-tight">FraudLens AI</h1>
+              <h1 className="text-lg font-bold tracking-tight">AIIVE</h1>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Insurance Verification</p>
             </div>
           </div>
@@ -166,7 +166,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Shield className="w-5 h-5 text-slate-400" />
-            <span className="font-bold text-slate-400 uppercase tracking-widest text-xs">FraudLens AI Security</span>
+            <span className="font-bold text-slate-400 uppercase tracking-widest text-xs">AIIVE Security</span>
           </div>
           <p className="text-slate-400 text-xs">
             Powered by Gemini 3.1 Pro. All claims are analyzed for authenticity and consistency.

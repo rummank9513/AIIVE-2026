@@ -1,5 +1,5 @@
 {
-  "name": "FraudLens AI - Car Insurance Fraud Detection",
+  "name": "AIIVE - Car Insurance Fraud Detection",
   "description": "AI-powered car insurance fraud detection system analyzing image authenticity and damage consistency.",
   "requestFramePermissions": [
     "camera"

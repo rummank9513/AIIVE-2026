@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Claim, MediaItem, Role } from '@/lib/types';
 
-const DB_KEY = 'fraudlens_claims_db';
+const DB_KEY = 'aiive_claims_db';
 const THUMB_MAX_PX = 800;
 const THUMB_QUALITY = 0.6;
 

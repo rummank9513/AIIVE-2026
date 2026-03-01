@@ -5,7 +5,7 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'FraudLens AI - Car Insurance Fraud Detection',
+  title: 'AIIVE - Car Insurance Fraud Detection',
   description: 'AI-powered car insurance fraud detection system analyzing image authenticity and damage consistency.',
 };
 

@@ -1,5 +1,7 @@
 AIIVE
 
+AIIVE Team - Rumman Khan, Het Shah
+
 AI Insurance Verification Engine
 (Pronounced like “Hive,” but with an A.)
 
